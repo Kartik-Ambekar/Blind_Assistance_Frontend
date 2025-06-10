@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'look_around_screen.dart';
 import 'detect_object_screen.dart';
 import 'chat_screen.dart';
+import 'currency_detect_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,12 @@ class _HomeScreenState extends State<HomeScreen> {
       'description': 'Identify objects in your environment',
       'icon': Icons.search,
       'route': DetectObjectScreen(),
+    },
+    {
+      'title': 'Currency Detection',
+      'description': 'Identify different types of currency',
+      'icon': Icons.attach_money,
+      'route': CurrencyDetectScreen(),
     },
     {
       'title': 'Chat Assistant',
@@ -78,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _announceOptions() async {
     await _speak(
-      "You can choose from three modes: 1. Look Around, 2. Detect Object, 3. Chat. Swipe to navigate or use voice commands.",
+      "You can choose from four modes: 1. Look Around, 2. Detect Object, 3. Currency Detection, 4. Chat. Swipe to navigate or use voice commands.",
     );
   }
 
@@ -114,8 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _navigateToScreen(0);
     } else if (command.contains('detect object')) {
       _navigateToScreen(1);
-    } else if (command.contains('chat')) {
+    } else if (command.contains('currency')) {
       _navigateToScreen(2);
+    } else if (command.contains('chat')) {
+      _navigateToScreen(3);
     }
   }
 

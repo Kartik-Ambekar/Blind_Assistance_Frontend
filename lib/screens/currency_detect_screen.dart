@@ -4,7 +4,6 @@ import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../config/api_config.dart';
 
 class CurrencyDetectScreen extends StatefulWidget {
   const CurrencyDetectScreen({super.key});
@@ -86,7 +85,7 @@ class _CurrencyDetectScreenState extends State<CurrencyDetectScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse(ApiConfig.currencyDetect),
+        Uri.parse('http://192.168.1.37:5569/api/currencyDetect'),
       );
 
       request.files.add(

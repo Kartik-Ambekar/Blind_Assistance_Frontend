@@ -47,5 +47,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>This app needs access to microphone for voice commands</string>
+		<key>NSCameraUsageDescription</key>
+		<string>This app needs access to camera for object detection and currency detection</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>This app needs access to speech recognition for voice commands</string>
 	</dict>
 </plist>

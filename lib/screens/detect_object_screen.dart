@@ -55,7 +55,7 @@ class _DetectObjectScreenState extends State<DetectObjectScreen> {
     await _controller!.initialize();
     // Set flash mode to off
     await _controller!.setFlashMode(FlashMode.off);
-    
+
     if (mounted) {
       setState(() {});
       _startDetection();
@@ -128,22 +128,59 @@ class _DetectObjectScreenState extends State<DetectObjectScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detect Object'),
+        backgroundColor: Colors.blue[900],
+        foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: CameraPreview(_controller!),
-          ),
+          // Camera preview
+          CameraPreview(_controller!),
+
+          // Overlay for detected object
           if (_lastDetectedObject.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Last detected: $_lastDetectedObject',
-                style: const TextStyle(fontSize: 18),
+            Positioned(
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Detected: $_lastDetectedObject',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
+
+          // Instructions
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              color: Colors.black.withOpacity(0.7),
+              child: const Text(
+                'Point the camera at an object.\nThe app will automatically detect and announce it.',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
-} 
+}

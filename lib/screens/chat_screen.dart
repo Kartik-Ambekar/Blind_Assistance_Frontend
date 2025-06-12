@@ -18,11 +18,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final SpeechToText _speechToText = SpeechToText();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FlutterTts _flutterTts = FlutterTts();
+  final TextEditingController _textController = TextEditingController();
   bool _isListening = false;
   String _lastWords = '';
   String _lastResponse = '';
   bool _isProcessing = false;
   bool _isSpeechComplete = false;
+  bool _isTextMode = false;
 
   @override
   void initState() {
@@ -47,16 +49,14 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _isSpeechComplete = false;
       _lastWords = '';
+      _isTextMode = false;
     });
-    
+
     await _speechToText.listen(
       onResult: _onSpeechResult,
       localeId: 'en_US',
       listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
-      onSoundLevelChange: (level) {
-        // Optional: Handle sound level changes
-      },
     );
     setState(() {
       _isListening = true;
@@ -69,8 +69,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _isListening = false;
       _isSpeechComplete = true;
     });
-    
-    // Only process the query if we have words and speech is complete
+
     if (_lastWords.isNotEmpty) {
       _processQuery(_lastWords);
     }
@@ -79,7 +78,6 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onSpeechResult(result) {
     setState(() {
       _lastWords = result.recognizedWords;
-      // Check if this is the final result
       if (result.finalResult) {
         _isSpeechComplete = true;
       }
@@ -89,34 +87,26 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<String> _createAudioFile(String text) async {
     final tempDir = await getTemporaryDirectory();
     final audioPath = '${tempDir.path}/query.mp3';
-    
-    // Use TTS to create audio file
     await _flutterTts.synthesizeToFile(text, audioPath);
-    
-    // Wait for the file to be created
     await Future.delayed(const Duration(milliseconds: 500));
-    
     return audioPath;
   }
 
   Future<void> _processQuery(String query) async {
-    if (query.isEmpty || !_isSpeechComplete) return;
+    if (query.isEmpty || (!_isSpeechComplete && !_isTextMode)) return;
 
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      // Create audio file from the speech
       final audioPath = await _createAudioFile(query);
-      
-      // Create a multipart request
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('http://192.168.1.37:5569/api/chat'),
       );
 
-      // Add the audio file to the request with key 'file'
       request.files.add(
         await http.MultipartFile.fromPath('file', audioPath),
       );
@@ -127,7 +117,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         final audioBytes = base64Decode(responseData['audio']);
-        
+
         final tempDir = await getTemporaryDirectory();
         final responseAudioPath = '${tempDir.path}/response.mp3';
         await File(responseAudioPath).writeAsBytes(audioBytes);
@@ -154,10 +144,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _toggleInputMode() {
+    setState(() {
+      _isTextMode = !_isTextMode;
+      if (_isTextMode) {
+        _stopListening();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _audioPlayer.dispose();
     _flutterTts.stop();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -166,50 +166,164 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
+        backgroundColor: Colors.blue[900],
+        foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _isListening ? 'Listening...' : 'Tap the microphone to speak',
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(height: 20),
-                  if (_lastWords.isNotEmpty)
-                    Text(
-                      'You said: $_lastWords',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  if (_isProcessing)
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  if (_lastResponse.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        _lastResponse,
-                        style: const TextStyle(fontSize: 16),
+          // Main content
+          Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Mode indicator
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _isTextMode
+                              ? 'Type your message below'
+                              : 'Double tap to speak',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                ],
+                      const SizedBox(height: 20),
+
+                      // Text input field (when in text mode)
+                      if (_isTextMode)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: TextField(
+                            controller: _textController,
+                            decoration: const InputDecoration(
+                              hintText: 'Type your message...',
+                              border: InputBorder.none,
+                            ),
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+
+                      // Last words or response
+                      if (_lastWords.isNotEmpty && !_isTextMode)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'You said: $_lastWords',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                      if (_isProcessing)
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+
+                      if (_lastResponse.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _lastResponse,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Bottom buttons
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Mode toggle button
+                FloatingActionButton(
+                  onPressed: _toggleInputMode,
+                  backgroundColor: Colors.blue[900],
+                  child: Icon(
+                    _isTextMode ? Icons.mic : Icons.keyboard,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Send/Record button
+                FloatingActionButton(
+                  onPressed: _isTextMode
+                      ? () {
+                          if (_textController.text.isNotEmpty) {
+                            _processQuery(_textController.text);
+                            _textController.clear();
+                          }
+                        }
+                      : (_isListening ? _stopListening : _startListening),
+                  backgroundColor: Colors.blue[900],
+                  child: Icon(
+                    _isTextMode
+                        ? Icons.send
+                        : (_isListening ? Icons.mic_off : Icons.mic),
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Double tap gesture detector
+          if (!_isTextMode)
+            Positioned.fill(
+              child: GestureDetector(
+                onDoubleTap: _isListening ? _stopListening : _startListening,
+                child: Container(
+                  color: Colors.transparent,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: FloatingActionButton(
-              onPressed: _isListening ? _stopListening : _startListening,
-              child: Icon(_isListening ? Icons.mic_off : Icons.mic),
-            ),
-          ),
         ],
       ),
     );
   }
-} 
+}

@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class LookAroundScreen extends StatefulWidget {
   const LookAroundScreen({super.key});
@@ -18,11 +19,30 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
   bool _isRecording = false;
   String? _videoPath;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isSpeaking = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeTts();
     _initializeCamera();
+  }
+
+  Future<void> _initializeTts() async {
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+  }
+
+  Future<void> _speak(String text) async {
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+    }
+    _isSpeaking = true;
+    await _flutterTts.speak(text);
+    _isSpeaking = false;
   }
 
   Future<void> _initializeCamera() async {
@@ -36,7 +56,10 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
     );
 
     await _controller!.initialize();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _speak("Camera initialized. Double tap the screen to start recording.");
+    }
   }
 
   Future<void> _startRecording() async {
@@ -49,6 +72,7 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
     setState(() {
       _isRecording = true;
     });
+    await _speak("Recording started. Double tap to stop recording.");
   }
 
   Future<void> _stopRecording() async {
@@ -58,6 +82,7 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
     setState(() {
       _isRecording = false;
     });
+    await _speak("Recording stopped. Processing video...");
 
     await _processVideo(video.path);
   }
@@ -83,14 +108,10 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
         await _audioPlayer.setFilePath(audioPath);
         await _audioPlayer.play();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error processing video')),
-        );
+        await _speak("Error processing video. Please try again.");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      await _speak("Error occurred. Please try again.");
     }
   }
 
@@ -98,6 +119,7 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
   void dispose() {
     _controller?.dispose();
     _audioPlayer.dispose();
+    _flutterTts.stop();
     super.dispose();
   }
 
@@ -112,21 +134,67 @@ class _LookAroundScreenState extends State<LookAroundScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Look Around'),
+        backgroundColor: Colors.blue[900],
+        foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: CameraPreview(_controller!),
+          // Camera preview
+          CameraPreview(_controller!),
+
+          // Recording indicator
+          if (_isRecording)
+            Positioned(
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.black.withOpacity(0.7),
+                child: const Text(
+                  'Recording...',
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
+          // Instructions
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              color: Colors.black.withOpacity(0.7),
+              child: Text(
+                _isRecording
+                    ? 'Double tap to stop recording'
+                    : 'Double tap to start recording',
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: _isRecording ? _stopRecording : _startRecording,
-              child: Text(_isRecording ? 'Stop Recording' : 'Start Recording'),
+
+          // Gesture detector for double tap
+          Positioned.fill(
+            child: GestureDetector(
+              onDoubleTap: _isRecording ? _stopRecording : _startRecording,
+              child: Container(
+                color: Colors.transparent,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-} 
+}

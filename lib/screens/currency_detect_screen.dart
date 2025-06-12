@@ -59,6 +59,7 @@ class _CurrencyDetectScreenState extends State<CurrencyDetectScreen> {
     if (mounted) {
       setState(() {});
       _startDetection();
+      _speak("Camera initialized. Point the camera at a currency note.");
     }
   }
 
@@ -167,7 +168,7 @@ class _CurrencyDetectScreenState extends State<CurrencyDetectScreen> {
               ),
             ),
 
-          // Instructions overlay
+          // Instructions
           Positioned(
             bottom: 40,
             left: 0,
